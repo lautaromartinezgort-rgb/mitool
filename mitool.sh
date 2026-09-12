@@ -13,7 +13,7 @@ while true; do
     echo -e "${azul}==================================${fin}"
     echo "1. Saludar al usuario"
     echo "2. Ver información del sistema"
-    echo "3. Buscar en DuckDuckGo"
+    echo "3. Buscar en DuckDuckGo (Navegador interactivo)"
     echo "0. Salir"
     echo -e "${azul}==================================${fin}"
     read -p "Selecciona una opción: " opcion
@@ -31,12 +31,14 @@ while true; do
             ;;
         3)
             clear
-            echo -e "${azul}--- BUSCADOR DUCKDUCKGO ---${fin}"
+            echo -e "${azul}--- BUSCADOR INTERACTIVO ---${fin}"
             read -p "Escribe lo que quieres buscar: " query
             query_url=$(echo "$query" | tr ' ' '+')
-            echo -e "\n${verde}Buscando en DuckDuckGo...${fin}"
-            curl -s "https://html.duckduckgo.com/html/?q=$query_url" -A "Mozilla/5.0" | grep -o '<a class="result__snippet[^>]*>.*</a>' | sed -e 's/<[^>]*>//g' | head -n 5
-            read -p "\nPresiona Enter para volver al menú..."
+            
+            # Abre DuckDuckGo Lite usando w3m
+            w3m "https://lite.duckduckgo.com/lite/?q=$query_url"
+            
+            read -p "\nPresiona Enter para volver al menú de Termux..."
             ;;
         0)
             echo -e "\n${rojo}¡Saliendo de la herramienta!${fin}"
