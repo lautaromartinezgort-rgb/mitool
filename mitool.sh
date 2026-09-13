@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 
 # Colores
 AZUL='\033[1;34m'
@@ -8,27 +8,44 @@ ROJO='\033[1;31m'
 MAGENTA='\033[1;35m'
 RESET='\033[0m'
 
-# Función de ejecución inteligente
+# Función de ejecución e instalación inteligente (Corregida)
 ejecutar_herramienta() {
     local paquete=$1
-    local comando=$2
+    shift
+    local comando=("$@")
     
     if ! command -v "$paquete" &> /dev/null; then
-        echo -e "${AMARILLO}[!] '$paquete' no está instalado. Instalándolo...${RESET}"
-        pkg install "$paquete" -y
+        echo -e "${AMARILLO}[!] '$paquete' no está instalado. Iniciando descarga...${RESET}"
+        
+        if command -v pkg &> /dev/null; then
+            pkg install "$paquete" -y
+        elif command -v apt &> /dev/null; then
+            sudo apt update && sudo apt install "$paquete" -y
+        else
+            echo -e "${ROJO}[!] No tienes 'pkg' ni 'apt'. No se puede descargar automáticamente.${RESET}"
+            return 1
+        fi
     fi
     
     if command -v "$paquete" &> /dev/null; then
         echo -e "${VERDE}[*] Abriendo $paquete...${RESET}"
         sleep 1
-        eval "$comando"
+        "${comando[@]}"
     else
-        echo -e "${ROJO}[!] No se pudo instalar $paquete.${RESET}"
+        echo -e "${ROJO}[!] Falló la descarga de '$paquete'. Intenta usar la Opción 7 (Actualizar Termux) primero.${RESET}"
     fi
 }
 
+# Bucle principal del menú
 while true; do
     clear
+    # ==========================================
+    # ARTE ASCII - EL PERRITO DE MITOOL
+    # ==========================================
+    echo -e "${AMARILLO}    |\\---/| ${RESET}"
+    echo -e "${AMARILLO}    | o_o |  ¡Guau! Bienvenido a${RESET}"
+    echo -e "${AMARILLO}     \\_^_/   MITOOL.${RESET}"
+    
     echo -e "${AZUL}=========================================${RESET}"
     echo -e "${VERDE}      MITOOL - MEGA PANEL DE COMANDOS    ${RESET}"
     echo -e "${AZUL}=========================================${RESET}"
@@ -55,10 +72,10 @@ while true; do
                 echo -e " [0] Volver al menú principal"
                 read -p "Elige editor: " ed
                 case $ed in
-                    1) ejecutar_herramienta "nano" "nano"; read -p "Enter para continuar..." ;;
-                    2) ejecutar_herramienta "micro" "micro"; read -p "Enter para continuar..." ;;
-                    3) ejecutar_herramienta "vim" "vim"; read -p "Enter para continuar..." ;;
-                    4) ejecutar_herramienta "joe" "joe"; read -p "Enter para continuar..." ;;
+                    1) ejecutar_herramienta "nano" nano; read -p "Presiona Enter para continuar..." ;;
+                    2) ejecutar_herramienta "micro" micro; read -p "Presiona Enter para continuar..." ;;
+                    3) ejecutar_herramienta "vim" vim; read -p "Presiona Enter para continuar..." ;;
+                    4) ejecutar_herramienta "joe" joe; read -p "Presiona Enter para continuar..." ;;
                     0) break ;;
                 esac
             done
@@ -75,14 +92,16 @@ while true; do
                     1) 
                         read -p "Ingresa URL (ej: google.com): " urlweb
                         [ -z "$urlweb" ] && urlweb="google.com"
-                        ejecutar_herramienta "w3m" "w3m $urlweb"
-                        read -p "Enter para continuar..." 
+                        [[ ! "$urlweb" =~ ^https?:// ]] && urlweb="https://$urlweb"
+                        ejecutar_herramienta "w3m" w3m "$urlweb"
+                        read -p "Presiona Enter para continuar..." 
                         ;;
                     2) 
                         read -p "Ingresa URL (ej: google.com): " urlweb2
                         [ -z "$urlweb2" ] && urlweb2="google.com"
-                        ejecutar_herramienta "lynx" "lynx $urlweb2"
-                        read -p "Enter para continuar..." 
+                        [[ ! "$urlweb2" =~ ^https?:// ]] && urlweb2="https://$urlweb2"
+                        ejecutar_herramienta "lynx" lynx "$urlweb2"
+                        read -p "Presiona Enter para continuar..." 
                         ;;
                     0) break ;;
                 esac
@@ -90,7 +109,24 @@ while true; do
             ;;
         3)
             echo -e "${VERDE}[+] Instalando herramientas de Red y Desarrollo...${RESET}"
-            pkg install curl wget nmap git openssh netcat dnsutils -y
+            if command -v pkg &> /dev/null; then 
+                echo -e "${AMARILLO}[*] Actualizando repositorios de Termux primero...${RESET}"
+                pkg update -y
+                
+                # Instala los paquetes de a uno para evitar que uno roto cancele a los demás
+                paquetes_red="curl wget nmap git openssh netcat-openbsd dnsutils"
+                for paquete in $paquetes_red; do
+                    echo -e "${AZUL}[*] Instalando $paquete...${RESET}"
+                    pkg install "$paquete" -y
+                done
+                
+                echo -e "${VERDE}[+] Instalación de herramientas de red finalizada.${RESET}"
+            elif command -v apt &> /dev/null; then
+                sudo apt update
+                sudo apt install curl wget nmap git openssh-client netcat-openbsd dnsutils -y
+            else
+                echo -e "${ROJO}[!] No se detectó pkg ni apt. No se puede instalar automáticamente.${RESET}"
+            fi
             read -p "Presiona Enter para continuar..."
             ;;
         4)
@@ -104,27 +140,39 @@ while true; do
                 echo -e " [0] Volver al menú principal"
                 read -p "Elige utilidad: " sys
                 case $sys in
-                    1) ejecutar_herramienta "htop" "htop"; read -p "Enter para continuar..." ;;
-                    2) ejecutar_herramienta "neofetch" "neofetch"; read -p "Enter para continuar..." ;;
-                    3) ejecutar_herramienta "tree" "tree"; read -p "Enter para continuar..." ;;
-                    4) ejecutar_herramienta "ncdu" "ncdu"; read -p "Enter para continuar..." ;;
+                    1) ejecutar_herramienta "htop" htop; read -p "Presiona Enter para continuar..." ;;
+                    2) ejecutar_herramienta "neofetch" neofetch; read -p "Presiona Enter para continuar..." ;;
+                    3) ejecutar_herramienta "tree" tree; read -p "Presiona Enter para continuar..." ;;
+                    4) ejecutar_herramienta "ncdu" ncdu; read -p "Presiona Enter para continuar..." ;;
                     0) break ;;
                 esac
             done
             ;;
         5)
             echo -e "${VERDE}[+] Instalando herramientas de archivos...${RESET}"
-            pkg install zip unzip tar rsync p7zip -y
+            if command -v pkg &> /dev/null; then 
+                pkg install zip unzip tar rsync p7zip -y
+            elif command -v apt &> /dev/null; then
+                sudo apt install zip unzip tar rsync p7zip-full -y
+            fi
             read -p "Presiona Enter para continuar..."
             ;;
         6)
             echo -e "${VERDE}[+] Instalando utilidades multimedia...${RESET}"
-            pkg install ffmpeg sox mpg123 -y
+            if command -v pkg &> /dev/null; then 
+                pkg install ffmpeg sox mpg123 -y
+            elif command -v apt &> /dev/null; then
+                sudo apt install ffmpeg sox mpg123 -y
+            fi
             read -p "Presiona Enter para continuar..."
             ;;
         7)
-            echo -e "${VERDE}[+] Actualizando todo Termux...${RESET}"
-            pkg update && pkg upgrade -y
+            echo -e "${VERDE}[+] Actualizando todo...${RESET}"
+            if command -v pkg &> /dev/null; then 
+                pkg update -y && pkg upgrade -y
+            elif command -v apt &> /dev/null; then
+                sudo apt update && sudo apt upgrade -y
+            fi
             read -p "Presiona Enter para continuar..."
             ;;
         0)
