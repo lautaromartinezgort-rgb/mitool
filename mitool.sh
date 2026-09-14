@@ -1,187 +1,361 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Colores
-AZUL='\033[1;34m'
-VERDE='\033[1;32m'
-AMARILLO='\033[1;33m'
-ROJO='\033[1;31m'
-MAGENTA='\033[1;35m'
-RESET='\033[0m'
+VERDE="\033[0;32m"
+CYAN="\033[0;36m"
+AMARILLO="\033[1;33m"
+ROJO="\033[0;31m"
+MAGENTA="\033[0;35m"
+RESET="\033[0m"
 
-# Función de ejecución e instalación inteligente (Corregida)
-ejecutar_herramienta() {
-    local paquete=$1
-    shift
-    local comando=("$@")
-    
-    if ! command -v "$paquete" &> /dev/null; then
-        echo -e "${AMARILLO}[!] '$paquete' no está instalado. Iniciando descarga...${RESET}"
-        
-        if command -v pkg &> /dev/null; then
-            pkg install "$paquete" -y
-        elif command -v apt &> /dev/null; then
-            sudo apt update && sudo apt install "$paquete" -y
-        else
-            echo -e "${ROJO}[!] No tienes 'pkg' ni 'apt'. No se puede descargar automáticamente.${RESET}"
-            return 1
-        fi
-    fi
-    
-    if command -v "$paquete" &> /dev/null; then
-        echo -e "${VERDE}[*] Abriendo $paquete...${RESET}"
-        sleep 1
-        "${comando[@]}"
-    else
-        echo -e "${ROJO}[!] Falló la descarga de '$paquete'. Intenta usar la Opción 7 (Actualizar Termux) primero.${RESET}"
-    fi
+pausa() {
+    echo ""
+    read -p "Presiona Enter para continuar..."
 }
 
-# Bucle principal del menú
+# ==========================================
+# SUBMENÚ 1: MULTIMEDIA, AUDIO Y VIDEO
+# ==========================================
+submenu_multimedia() {
+    while true; do
+        clear
+        echo -e "${CYAN}=====================================${RESET}"
+        echo -e "${VERDE}     MULTIMEDIA, AUDIO Y VIDEO      ${RESET}"
+        echo -e "${CYAN}=====================================${RESET}"
+        echo -e " 1) Reproducir música local (mpv / cmus)"
+        echo -e " 2) Ver información de archivo multimedia (mediainfo)"
+        echo -e " 3) Convertir MP4 a MP3 (ffmpeg)"
+        echo -e " 4) Extraer audio sin reencodear (ffmpeg)"
+        echo -e " 5) Recortar un video o audio (ffmpeg)"
+        echo -e " 6) Cambiar resolución de video (ffmpeg)"
+        echo -e " 7) Unir varios videos MP4 (ffmpeg)"
+        echo -e " 8) Convertir GIF a MP4 (ffmpeg)"
+        echo -e " 9) Grabar audio con micrófono (termux-audio-record)"
+        echo -e "10) Convertir formato de imagen (PNG <-> JPG)"
+        echo -e "11) Reproducir radio online por terminal"
+        echo -e "12) Instalar paquetes multimedia principales"
+        echo -e "13) ${ROJO}<- Volver al menú principal${RESET}"
+        echo -e "${CYAN}=====================================${RESET}"
+        read -p "Selecciona una opción [1-13]: " opc
+        case $opc in
+            1)
+                read -p "Ruta del archivo o carpeta de música: " ruta
+                mpv "$ruta" || cmus
+                pausa ;;
+            2)
+                read -p "Ruta del archivo multimedia: " ruta
+                mediainfo "$ruta" || ffprobe "$ruta"
+                pausa ;;
+            3)
+                read -p "Video de entrada (ej: video.mp4): " in
+                read -p "Audio de salida (ej: audio.mp3): " out
+                ffmpeg -i "$in" -vn -ar 44100 -ac 2 -b:a 192k "$out"
+                pausa ;;
+            4)
+                read -p "Video de entrada: " in
+                read -p "Nombre salida (ej: audio.aac): " out
+                ffmpeg -i "$in" -vn -c:a copy "$out"
+                pausa ;;
+            5)
+                read -p "Archivo entrada: " in
+                read -p "Tiempo inicio (HH:MM:SS): " ss
+                read -p "Duración (HH:MM:SS): " t
+                read -p "Archivo salida: " out
+                ffmpeg -ss "$ss" -i "$in" -to "$t" -c copy "$out"
+                pausa ;;
+            6)
+                read -p "Video entrada: " in
+                read -p "Resolución (ej: 1280x720): " res
+                read -p "Video salida: " out
+                ffmpeg -i "$in" -vf scale="$res" "$out"
+                pausa ;;
+            7)
+                echo "Crea un archivo lista.txt con: file 'video1.mp4'..."
+                ffmpeg -f concat -safe 0 -i lista.txt -c copy salida.mp4
+                pausa ;;
+            8)
+                read -p "GIF entrada: " in
+                read -p "MP4 salida: " out
+                ffmpeg -i "$in" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "$out"
+                pausa ;;
+            9)
+                read -p "Nombre del audio grabado (.mp3): " rec
+                termux-audio-record -f "$rec"
+                echo "Grabando... ejecuta 'termux-audio-record -d' para detener."
+                pausa ;;
+            10)
+                read -p "Imagen entrada: " in
+                read -p "Imagen salida: " out
+                ffmpeg -i "$in" "$out"
+                pausa ;;
+            11)
+                read -p "URL de la radio/stream: " url
+                mpv "$url"
+                pausa ;;
+            12)
+                pkg install ffmpeg mpv cmus mediainfo -y
+                pausa ;;
+            13) break ;;
+            *) echo -e "${ROJO}Opción inválida${RESET}"; sleep 1 ;;
+        esac
+    done
+}
+
+# ==========================================
+# SUBMENÚ 2: DESCARGAS Y RED
+# ==========================================
+submenu_descargas() {
+    while true; do
+        clear
+        echo -e "${CYAN}=====================================${RESET}"
+        echo -e "${AMARILLO}         DESCARGAS Y RED            ${RESET}"
+        echo -e "${CYAN}=====================================${RESET}"
+        echo -e " 1) Descargar video de YouTube / Redes (yt-dlp)"
+        echo -e " 2) Descargar SOLO audio en MP3 (yt-dlp)"
+        echo -e " 3) Descargar lista de reproducción completa (yt-dlp)"
+        echo -e " 4) Descargar archivo directo (wget)"
+        echo -e " 5) Descargar con cliente multihilo (aria2c)"
+        echo -e " 6) Descargar torrent por terminal (aria2c / transmission)"
+        echo -e " 7) Probar velocidad de internet (speedtest-cli)"
+        echo -e " 8) Ver mi IP pública y localización (curl)"
+        echo -e " 9) Ver mi IP local e interfaces (ifconfig / ip a)"
+        echo -e "10) Hacer Ping a un servidor"
+        echo -e "11) Escanear puertos abiertos locales (nmap)"
+        echo -e "12) Instalar herramientas de descargas"
+        echo -e "13) ${ROJO}<- Volver al menú principal${RESET}"
+        echo -e "${CYAN}=====================================${RESET}"
+        read -p "Selecciona una opción [1-13]: " opc
+        case $opc in
+            1)
+                read -p "URL del video: " url
+                yt-dlp "$url"
+                pausa ;;
+            2)
+                read -p "URL del audio/video: " url
+                yt-dlp -x --audio-format mp3 "$url"
+                pausa ;;
+            3)
+                read -p "URL de la Playlist: " url
+                yt-dlp -i -f mp4 "$url"
+                pausa ;;
+            4)
+                read -p "URL del archivo: " url
+                wget -c "$url"
+                pausa ;;
+            5)
+                read -p "URL del archivo: " url
+                aria2c -x 16 -s 16 "$url"
+                pausa ;;
+            6)
+                read -p "Ruta archivo .torrent o Magnet URL: " tor
+                aria2c "$tor"
+                pausa ;;
+            7)
+                speedtest-cli || speedtest
+                pausa ;;
+            8)
+                curl ifconfig.me; echo ""
+                curl ipinfo.io
+                pausa ;;
+            9)
+                ip a
+                pausa ;;
+            10)
+                read -p "Dominio o IP: " host
+                ping -c 4 "$host"
+                pausa ;;
+            11)
+                read -p "IP a escanear (ej: 192.168.1.1): " ip
+                nmap "$ip"
+                pausa ;;
+            12)
+                pkg install yt-dlp wget aria2 speedtest-cli nmap -y
+                pausa ;;
+            13) break ;;
+            *) echo -e "${ROJO}Opción inválida${RESET}"; sleep 1 ;;
+        esac
+    done
+}
+
+# ==========================================
+# SUBMENÚ 3: EDITORES Y ARCHIVOS
+# ==========================================
+submenu_editores() {
+    while true; do
+        clear
+        echo -e "${CYAN}=====================================${RESET}"
+        echo -e "${MAGENTA}        EDITORES Y ARCHIVOS          ${RESET}"
+        echo -e "${CYAN}=====================================${RESET}"
+        echo -e " 1) Editar con Nano"
+        echo -e " 2) Editar con Vim / Neovim"
+        echo -e " 3) Editar con Micro (editor fácil e intuitivo)"
+        echo -e " 4) Explorador de archivos visual (ranger / mc)"
+        echo -e " 5) Buscar texto dentro de archivos (grep / ripgrep)"
+        echo -e " 6) Buscar archivos por nombre (find)"
+        echo -e " 7) Comprimir carpeta en ZIP"
+        echo -e " 8) Descomprimir ZIP"
+        echo -e " 9) Comprimir en TAR.GZ"
+        echo -e "10) Descomprimir TAR.GZ / RAR / 7z"
+        echo -e "11) Ver uso de espacio detallado (ncdu)"
+        echo -e "12) Instalar editores y compresores"
+        echo -e "13) ${ROJO}<- Volver al menú principal${RESET}"
+        echo -e "${CYAN}=====================================${RESET}"
+        read -p "Selecciona una opción [1-13]: " opc
+        case $opc in
+            1)
+                read -p "Archivo a editar: " f
+                nano "$f" ;;
+            2)
+                read -p "Archivo a editar: " f
+                vim "$f" || nvim "$f" ;;
+            3)
+                read -p "Archivo a editar: " f
+                micro "$f" ;;
+            4)
+                ranger || mc
+                pausa ;;
+            5)
+                read -p "Texto a buscar: " txt
+                grep -rnw '.' -e "$txt"
+                pausa ;;
+            6)
+                read -p "Nombre o patrón (ej: *.mp3): " pat
+                find . -name "$pat"
+                pausa ;;
+            7)
+                read -p "Nombre del archivo salida (.zip): " z
+                read -p "Carpeta o archivo a comprimir: " f
+                zip -r "$z" "$f"
+                pausa ;;
+            8)
+                read -p "Archivo ZIP: " z
+                unzip "$z"
+                pausa ;;
+            9)
+                read -p "Nombre salida (.tar.gz): " t
+                read -p "Carpeta a comprimir: " f
+                tar -czvf "$t" "$f"
+                pausa ;;
+            10)
+                read -p "Archivo comprimido: " f
+                if [[ $f == *.tar.gz ]]; then tar -xzvf "$f"; fi
+                if [[ $f == *.zip ]]; then unzip "$f"; fi
+                if [[ $f == *.7z ]]; then 7z x "$f"; fi
+                if [[ $f == *.rar ]]; then unrar x "$f"; fi
+                pausa ;;
+            11)
+                ncdu
+                pausa ;;
+            12)
+                pkg install nano vim micro ranger mc zip unzip p7zip unrar ncdu -y
+                pausa ;;
+            13) break ;;
+            *) echo -e "${ROJO}Opción inválida${RESET}"; sleep 1 ;;
+        esac
+    done
+}
+
+# ==========================================
+# SUBMENÚ 4: MANTENIMIENTO Y SISTEMA
+# ==========================================
+submenu_sistema() {
+    while true; do
+        clear
+        echo -e "${CYAN}=====================================${RESET}"
+        echo -e "${VERDE}     MANTENIMIENTO Y SISTEMA        ${RESET}"
+        echo -e "${CYAN}=====================================${RESET}"
+        echo -e " 1) Actualizar todos los paquetes (pkg update)"
+        echo -e " 2) Limpiar caché y paquetes innecesarios"
+        echo -e " 3) Ver uso de RAM y CPU en tiempo real (htop / btop)"
+        echo -e " 4) Información completa del sistema (neofetch)"
+        echo -e " 5) Configurar/Otorgar permisos de almacenamiento"
+        echo -e " 6) Ver procesos activos (ps aux)"
+        echo -e " 7) Matar un proceso (kill)"
+        echo -e " 8) Crear respaldo de la Home de Termux"
+        echo -e " 9) Restaurar respaldo de Termux"
+        echo -e "10) Cambiar contraseña de usuario Termux"
+        echo -e "11) Instalar monitores de sistema"
+        echo -e "12) ${ROJO}<- Volver al menú principal${RESET}"
+        echo -e "${CYAN}=====================================${RESET}"
+        read -p "Selecciona una opción [1-12]: " opc
+        case $opc in
+            1)
+                pkg update && pkg upgrade -y
+                pausa ;;
+            2)
+                pkg clean && apt autoremove -y
+                echo "Caché limpiada con éxito."
+                pausa ;;
+            3)
+                htop || btop || top
+                pausa ;;
+            4)
+                neofetch || fastfetch
+                pausa ;;
+            5)
+                termux-setup-storage
+                pausa ;;
+            6)
+                ps aux
+                pausa ;;
+            7)
+                read -p "PID del proceso a cerrar: " pid
+                kill -9 "$pid"
+                pausa ;;
+            8)
+                echo "Creando copia en la memoria interna..."
+                tar -cvzf /sdcard/termux_backup.tar.gz -C /data/data/com.termux/files ./home ./usr
+                echo "Guardado en /sdcard/termux_backup.tar.gz"
+                pausa ;;
+            9)
+                echo "Restaurando copia..."
+                tar -xvzf /sdcard/termux_backup.tar.gz -C /data/data/com.termux/files
+                pausa ;;
+            10)
+                passwd
+                pausa ;;
+            11)
+                pkg install htop btop neofetch -y
+                pausa ;;
+            12) break ;;
+            *) echo -e "${ROJO}Opción inválida${RESET}"; sleep 1 ;;
+        esac
+    done
+}
+
+# ==========================================
+# MENÚ PRINCIPAL
+# ==========================================
 while true; do
     clear
-    # ==========================================
-    # ARTE ASCII - EL PERRITO DE MITOOL
-    # ==========================================
-    echo -e "${AMARILLO}    |\\---/| ${RESET}"
-    echo -e "${AMARILLO}    | o_o |  ¡Guau! Bienvenido a${RESET}"
-    echo -e "${AMARILLO}     \\_^_/   MITOOL.${RESET}"
-    
-    echo -e "${AZUL}=========================================${RESET}"
-    echo -e "${VERDE}      MITOOL - MEGA PANEL DE COMANDOS    ${RESET}"
-    echo -e "${AZUL}=========================================${RESET}"
-    echo -e " ${MAGENTA}[ 1 ] Editores de Texto (Nano, Micro, Vim, Joe)${RESET}"
-    echo -e " ${MAGENTA}[ 2 ] Navegadores Web (W3M, Lynx)${RESET}"
-    echo -e " ${MAGENTA}[ 3 ] Redes y Servidores (Curl, Wget, Nmap, Git, SSH)${RESET}"
-    echo -e " ${MAGENTA}[ 4 ] Sistema y Monitoreo (Htop, Neofetch, Tree, Ncdu)${RESET}"
-    echo -e " ${MAGENTA}[ 5 ] Archivos y Compresión (Zip, Unzip, Tar, Rsync)${RESET}"
-    echo -e " ${MAGENTA}[ 6 ] Multimedia y Audio (FFmpeg, Sox, Mpg123)${RESET}"
-    echo -e " ${MAGENTA}[ 7 ] Actualizar todo Termux (Pkg upgrade)${RESET}"
-    echo -e " ${ROJO}[ 0 ] Salir${RESET}"
-    echo -e "${AZUL}=========================================${RESET}"
-    read -p "Elige una categoría o opción: " cat_opcion
+    echo -e "${CYAN}=====================================${RESET}"
+    echo -e "${VERDE}    SUPER MENÚ MULTIFUNCIÓN TERMUX  ${RESET}"
+    echo -e "${CYAN}=====================================${RESET}"
+    echo -e " 1) 🎵 Multimedia, Audio y Video"
+    echo -e " 2) 📥 Descargas y Comandos de Red"
+    echo -e " 3) 📝 Editores, Comprimidos y Archivos"
+    echo -e " 4) ⚙️  Mantenimiento y Sistema"
+    echo -e " 5) 🚀 INSTALAR TODO DE UNA VEZ (Herramientas completas)"
+    echo -e " 6) ${ROJO}Salir${RESET}"
+    echo -e "${CYAN}=====================================${RESET}"
+    read -p "Selecciona una carpeta/categoría [1-6]: " opc_principal
 
-    case $cat_opcion in
-        1)
-            while true; do
-                clear
-                echo -e "${AZUL}=== EDITORES DE TEXTO ===${RESET}"
-                echo -e " [1] Abrir / Instalar Nano"
-                echo -e " [2] Abrir / Instalar Micro"
-                echo -e " [3] Abrir / Instalar Vim"
-                echo -e " [4] Abrir / Instalar Joe"
-                echo -e " [0] Volver al menú principal"
-                read -p "Elige editor: " ed
-                case $ed in
-                    1) ejecutar_herramienta "nano" nano; read -p "Presiona Enter para continuar..." ;;
-                    2) ejecutar_herramienta "micro" micro; read -p "Presiona Enter para continuar..." ;;
-                    3) ejecutar_herramienta "vim" vim; read -p "Presiona Enter para continuar..." ;;
-                    4) ejecutar_herramienta "joe" joe; read -p "Presiona Enter para continuar..." ;;
-                    0) break ;;
-                esac
-            done
-            ;;
-        2)
-            while true; do
-                clear
-                echo -e "${AZUL}=== NAVEGADORES WEB ===${RESET}"
-                echo -e " [1] W3M (Navegador visual en consola)"
-                echo -e " [2] Lynx (Navegador clásico de texto)"
-                echo -e " [0] Volver al menú principal"
-                read -p "Elige navegador: " nav
-                case $nav in
-                    1) 
-                        read -p "Ingresa URL (ej: google.com): " urlweb
-                        [ -z "$urlweb" ] && urlweb="google.com"
-                        [[ ! "$urlweb" =~ ^https?:// ]] && urlweb="https://$urlweb"
-                        ejecutar_herramienta "w3m" w3m "$urlweb"
-                        read -p "Presiona Enter para continuar..." 
-                        ;;
-                    2) 
-                        read -p "Ingresa URL (ej: google.com): " urlweb2
-                        [ -z "$urlweb2" ] && urlweb2="google.com"
-                        [[ ! "$urlweb2" =~ ^https?:// ]] && urlweb2="https://$urlweb2"
-                        ejecutar_herramienta "lynx" lynx "$urlweb2"
-                        read -p "Presiona Enter para continuar..." 
-                        ;;
-                    0) break ;;
-                esac
-            done
-            ;;
-        3)
-            echo -e "${VERDE}[+] Instalando herramientas de Red y Desarrollo...${RESET}"
-            if command -v pkg &> /dev/null; then 
-                echo -e "${AMARILLO}[*] Actualizando repositorios de Termux primero...${RESET}"
-                pkg update -y
-                
-                # Instala los paquetes de a uno para evitar que uno roto cancele a los demás
-                paquetes_red="curl wget nmap git openssh netcat-openbsd dnsutils"
-                for paquete in $paquetes_red; do
-                    echo -e "${AZUL}[*] Instalando $paquete...${RESET}"
-                    pkg install "$paquete" -y
-                done
-                
-                echo -e "${VERDE}[+] Instalación de herramientas de red finalizada.${RESET}"
-            elif command -v apt &> /dev/null; then
-                sudo apt update
-                sudo apt install curl wget nmap git openssh-client netcat-openbsd dnsutils -y
-            else
-                echo -e "${ROJO}[!] No se detectó pkg ni apt. No se puede instalar automáticamente.${RESET}"
-            fi
-            read -p "Presiona Enter para continuar..."
-            ;;
-        4)
-            while true; do
-                clear
-                echo -e "${AZUL}=== SISTEMA Y MONITOREO ===${RESET}"
-                echo -e " [1] Htop (Administrador de procesos)"
-                echo -e " [2] Neofetch (Info del sistema)"
-                echo -e " [3] Tree (Estructura de carpetas)"
-                echo -e " [4] Ncdu (Analizador de espacio en disco)"
-                echo -e " [0] Volver al menú principal"
-                read -p "Elige utilidad: " sys
-                case $sys in
-                    1) ejecutar_herramienta "htop" htop; read -p "Presiona Enter para continuar..." ;;
-                    2) ejecutar_herramienta "neofetch" neofetch; read -p "Presiona Enter para continuar..." ;;
-                    3) ejecutar_herramienta "tree" tree; read -p "Presiona Enter para continuar..." ;;
-                    4) ejecutar_herramienta "ncdu" ncdu; read -p "Presiona Enter para continuar..." ;;
-                    0) break ;;
-                esac
-            done
-            ;;
+    case $opc_principal in
+        1) submenu_multimedia ;;
+        2) submenu_descargas ;;
+        3) submenu_editores ;;
+        4) submenu_sistema ;;
         5)
-            echo -e "${VERDE}[+] Instalando herramientas de archivos...${RESET}"
-            if command -v pkg &> /dev/null; then 
-                pkg install zip unzip tar rsync p7zip -y
-            elif command -v apt &> /dev/null; then
-                sudo apt install zip unzip tar rsync p7zip-full -y
-            fi
-            read -p "Presiona Enter para continuar..."
-            ;;
+            echo -e "\n${AMARILLO}Instalando todos los programas necesarios...${RESET}"
+            pkg update && pkg upgrade -y
+            pkg install ffmpeg mpv cmus mediainfo yt-dlp wget aria2 speedtest-cli nmap nano vim micro ranger mc zip unzip p7zip unrar ncdu htop btop neofetch -y
+            echo -e "${VERDE}¡Instalación completa!${RESET}"
+            pausa ;;
         6)
-            echo -e "${VERDE}[+] Instalando utilidades multimedia...${RESET}"
-            if command -v pkg &> /dev/null; then 
-                pkg install ffmpeg sox mpg123 -y
-            elif command -v apt &> /dev/null; then
-                sudo apt install ffmpeg sox mpg123 -y
-            fi
-            read -p "Presiona Enter para continuar..."
-            ;;
-        7)
-            echo -e "${VERDE}[+] Actualizando todo...${RESET}"
-            if command -v pkg &> /dev/null; then 
-                pkg update -y && pkg upgrade -y
-            elif command -v apt &> /dev/null; then
-                sudo apt update && sudo apt upgrade -y
-            fi
-            read -p "Presiona Enter para continuar..."
-            ;;
-        0)
-            echo -e "${ROJO}Saliendo de Mitool... ¡Hasta luego!${RESET}"
-            exit 0
-            ;;
+            echo -e "\n${ROJO}¡Hasta luego!${RESET}"
+            exit 0 ;;
         *)
-            echo -e "${ROJO}[!] Opción no válida.${RESET}"
-            sleep 1
-            ;;
+            echo -e "\n${ROJO}Opción no válida.${RESET}"
+            sleep 1 ;;
     esac
 done
